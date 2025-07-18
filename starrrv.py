@@ -10,16 +10,9 @@
 # - National 1% threshold for party eligibility
 # - Comparison with FPTP and MMP
 
-# In[617]:
-
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-
-# In[618]:
-
 
 # Parameters
 num_districts = 79
@@ -35,15 +28,13 @@ print("Number of voters: ", num_voters)
 print(party_names)
 
 
-# In[619]:
-
-
 # STAR voting (district)
 def star_voting_winner(score_df):
     totals = score_df.sum()
     top_two = totals.nlargest(2).index.tolist()
     runoff = score_df[top_two]
     return top_two[np.argmax((runoff[top_two[0]] > runoff[top_two[1]]).sum())]
+
 
 # Reweighted Range Voting (RRV)
 def reweighted_range_voting(score_df, seats):
@@ -58,15 +49,9 @@ def reweighted_range_voting(score_df, seats):
     return seats_won
 
 
-# In[620]:
-
-
 # FPTP voting
 def fptp_winner(score_df):
     return (score_df == score_scale - 1).sum().idxmax()
-
-
-# In[621]:
 
 
 # Tactical voting: Even → Party A, Odd → Party B
@@ -87,17 +72,11 @@ def tactical_voting(df):
     return df
 
 
-# In[622]:
-
-
 # Threshold filtering
 def threshold_filter(df, threshold=0.02):
     totals = df.sum()
     share = totals / totals.sum()
     return df[share[share >= threshold].index]
-
-
-# In[623]:
 
 
 # Generate split block scores
@@ -144,6 +123,7 @@ def generate_block_scores(v, pt, dominant, favor_minor=True):
                     scores[i, j] = np.random.choice([0, 1])
     return scores
 
+
 def generate_split_voter_blocks(n_voters, dominant, ratio):
     '''
     Split voter block based on the ratio of voters that would score minor parties ahead of major party in the same coalition
@@ -155,18 +135,12 @@ def generate_split_voter_blocks(n_voters, dominant, ratio):
     return np.vstack((block1, block2))
 
 
-# In[624]:
-
-
 # Soft two-party bias
 def generate_scores(n, p, dominant, max_support=0.4, bias_strength=1):
     base = np.random.randint(0, score_scale, (n, p))
     for d in dominant:
         base[:, d] += np.random.binomial(1, max_support, n)
     return np.clip(base, 0, score_scale - 1)
-
-
-# In[625]:
 
 
 # Generate district and party data
@@ -180,9 +154,6 @@ party_index = [x for x in range(len(party_names))]
 dominant = [0, 1]
 dominant_set = set(dominant)  # Type-cast to `set`
 minor = [x for x in party_index if x not in dominant]
-
-
-# In[626]:
 
 
 # Initialize parameters
@@ -214,9 +185,6 @@ print("Ratio of dominant party supporters in the FPTP partylist: ", partylist_do
 print("Ratio of minor party supporters in the FPTP partylist: ", partylist_minor_pref)
 
 
-# In[627]:
-
-
 # Generate per district data
 for d in district_candidates:
     # STAR, RRV
@@ -231,9 +199,6 @@ tactical_df = tactical_voting(national_df)
 filtered_df = threshold_filter(tactical_df, thresh)
 
 
-# In[628]:
-
-
 # STAR district winners
 district_star = pd.Series(0, index=party_names)
 for df in district_scores.values():
@@ -244,12 +209,10 @@ for df in district_scores.values():
             break
 
 
-# In[629]:
-
-
 # Proportional allocations
 # rrv = reweighted_range_voting(tactical_df, national_seats)
 rrv = reweighted_range_voting(national_df, national_seats)
+
 
 # Combine for stacked STAR + RRV chart
 combined_star_rrv = pd.DataFrame({
@@ -257,23 +220,6 @@ combined_star_rrv = pd.DataFrame({
     'National (RRV)': rrv
 }).fillna(0).astype(int)
 # total_star_rrv = district_star + rrv
-
-
-# In[630]:
-
-
-# MMP results 
-ideal = filtered_df.sum()
-ideal = ideal / ideal.sum() * num_districts
-ideal = ideal.round()
-
-mmp_topup = ideal - district_fptp[ideal.index]
-mmp_topup[mmp_topup < 0] = 0
-total_mmp = district_fptp.copy()
-total_mmp.update(district_fptp[ideal.index] + mmp_topup)
-
-
-# In[631]:
 
 
 # FPTP district winners
@@ -284,10 +230,6 @@ for df in fptp_district_scores.values():
         if winner.startswith(p):
             district_fptp[p] += 1
             break
-
-
-# In[632]:
-
 
 # --- List PR (Largest Remainder Method/Hare Quota) ---
 single_choice_votes = []
@@ -320,7 +262,15 @@ lrm_additional[remainder_winners] = 1
 hare_quota_seats = initial_seats.reindex(party_names, fill_value=0) + lrm_additional
 
 
-# In[633]:
+# MMP results
+ideal = filtered_df.sum()
+ideal = ideal / ideal.sum() * num_districts
+ideal = ideal.round()
+
+mmp_topup = ideal - district_fptp[ideal.index]
+mmp_topup[mmp_topup < 0] = 0
+total_mmp = district_fptp.copy()
+total_mmp.update(district_fptp[ideal.index] + mmp_topup)
 
 
 # Plotting
@@ -330,7 +280,7 @@ fptp_title = "FPTP + Party List (" + th_int + "% Threshold + Tactical)"
 mmp_title = "MMP (" + th_int + "% Threshold + Tactical)"
 tdp_int = str(int(total_domin_pref*100))
 ds_int = str(int(domin_star_voter_ratio *100))
-chart_title = str(num_voters) + " voters; " + tdp_int + "% support for major parties in FPTP; " + ds_int + "% of major party voters would score aligned minor party higher." 
+chart_title = str(num_voters) + " voters; " + tdp_int + "% support for major parties in FPTP; " + ds_int + "% of major party voters would score aligned minor party higher."
 fig, ax = plt.subplots(1, 3, figsize=(18, 5))
 # total_star_rrv.sort_values().plot(kind='barh', ax=ax[0], color='skyblue')
 
@@ -367,23 +317,8 @@ plt.tight_layout()
 plt.savefig("result.png", bbox_inches='tight', bbox_extra_artists=[my_suptitle])
 plt.show()
 
-
-# In[634]:
-
-
 print("total STAR + RRV seats: ", district_star.sum() + rrv.sum())
 print("total FPTP seats: ", district_fptp.sum() + hare_quota_seats.sum())
 print("total MMP seats: ", total_mmp.sum())
 
-
-# In[635]:
-
-
-print(national_df)
-
-
-# In[ ]:
-
-
-
-
+# print(national_df)
