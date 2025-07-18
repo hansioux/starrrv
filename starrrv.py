@@ -10,6 +10,7 @@
 # - National 1% threshold for party eligibility
 # - Comparison with FPTP and MMP
 
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -314,7 +315,7 @@ ax[2].set_xlabel("Seats")
 my_suptitle = plt.suptitle(chart_title, y = 0.0)
 
 plt.tight_layout()
-plt.savefig("result.png", bbox_inches='tight', bbox_extra_artists=[my_suptitle])
+plt.savefig("results/result.png", bbox_inches='tight', bbox_extra_artists=[my_suptitle])
 plt.show()
 
 print("total STAR + RRV seats: ", district_star.sum() + rrv.sum())
@@ -322,3 +323,21 @@ print("total FPTP seats: ", district_fptp.sum() + hare_quota_seats.sum())
 print("total MMP seats: ", total_mmp.sum())
 
 # print(national_df)
+
+# Save ballots
+spath = 'results/'+str(num_voters)+'_'+str(num_districts)+'_'+str(national_seats)+'_'+str(num_parties)+'_'+str(domin_pref)+'_'+str(domin_star_voter_ratio)
+os.makedirs(spath, exist_ok=True)
+# STAR district scores
+for df_name, df in district_scores.items():
+    filename = f"{spath}/star_{df_name}.csv"
+    df.to_csv(filename, index=False)
+    # print(f"DataFrame '{df_name}' saved to '{filename}'")
+national_df.to_csv(spath+'/rrv_ballots.csv', index=False)
+
+# FPTP district scores
+for df_name, df in fptp_district_scores.items():
+    filename = f"{spath}/fptp_{df_name}.csv"
+    df.to_csv(filename, index=False)
+    # print(f"DataFrame '{df_name}' saved to '{filename}'")
+# FPTP Party list votes
+np.savetxt(spath+'/fptp_partylist.csv', single_choice_votes, fmt="%s", delimiter=",")
