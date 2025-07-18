@@ -14,8 +14,10 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from concurrent.futures import ThreadPoolExecutor
 
 # Parameters
+num_threads = 4
 num_districts = 79
 num_parties = 6
 num_voters = 1000
@@ -79,20 +81,17 @@ def threshold_filter(df, threshold=0.02):
     share = totals / totals.sum()
     return df[share[share >= threshold].index]
 
-
 # Generate split block scores
-# def generate_block_scores(v, pt, p, dominant, favor_minor=True):
-def generate_block_scores(v, pt, dominant, favor_minor=True):
+def generate_block_scores(v, pt, dominant, favor_minor):
     '''
     Allocated scores to each of parties in pt for v voter, based on party and coalition preference, with probability of p.
     '''
     scores = np.zeros((v, pt), dtype=int)
-    # evens = list(range(0, num_parties, 2))
-    # odds = list(range(1, num_parties, 2))
+
     for i in range(v):
-        if favor_minor:
+        for j in range(pt):
+            if favor_minor:
             # Voters would score minor parites ahead of major parties in their coalition
-            for j in range(pt):
                 if j == 0:
                     scores[i, j] = np.random.choice([0, 1])
                 elif j == 1:
@@ -106,9 +105,8 @@ def generate_block_scores(v, pt, dominant, favor_minor=True):
                     scores[i, j] = np.random.choice([2, 3, 4, 5])
                 else:
                     scores[i, j] = np.random.choice([0, 1])
-        else:
+            else:
             # Voters would score major parties ahead of minor parties
-            for j in range(pt):
                 if j == 0:
                     scores[i, j] = np.random.choice([0, 5])
                 elif j == 1:
@@ -122,6 +120,57 @@ def generate_block_scores(v, pt, dominant, favor_minor=True):
                     scores[i, j] = np.random.choice([3, 4])
                 else:
                     scores[i, j] = np.random.choice([0, 1])
+
+    return scores
+
+
+def score_ballot(pt, dominant, favor_minor):
+    b = np.zeros(pt, dtype=int)
+    for j in range(pt):
+        if favor_minor:
+        # Voters would score minor parites ahead of major parties in their coalition
+            if j == 0:
+                b[j] = np.random.choice([0, 1])
+            elif j == 1:
+                if b[0] != 1:
+                    b[j] = 1
+                else:
+                    b[j] = 0
+            elif (j % 2 == 0 and b[0] == 1):
+                b[j] = np.random.choice([2, 3, 4, 5])
+            elif (j % 2 == 1 and b[1] == 1):
+                b[j] = np.random.choice([2, 3, 4, 5])
+            else:
+                b[j] = np.random.choice([0, 1])
+        else:
+        # Voters would score major parties ahead of minor parties
+            if j == 0:
+                b[j] = np.random.choice([0, 5])
+            elif j == 1:
+                if b[0] != 5:
+                    b[j] = 5
+                else:
+                    b[j] = 0
+            elif (j % 2 == 0 and b[0] == 5):
+                b[j] = np.random.choice([3, 4])
+            elif (j % 2 == 1 and b[1] == 5):
+                b[j] = np.random.choice([3, 4])
+            else:
+                b[j] = np.random.choice([0, 1])
+
+    return b
+
+
+# Generate split block scores
+def generate_threads(v, pt, dominant, favor_minor=True):
+    '''
+    Allocated scores to each of parties in pt for v voter, based on party and coalition preference, with probability of p.
+    '''
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+       ballots  = list(executor.map(lambda _: score_ballot(pt, dominant, favor_minor), range(v)))
+
+    scores = np.array(ballots)
+
     return scores
 
 
@@ -131,8 +180,10 @@ def generate_split_voter_blocks(n_voters, dominant, ratio):
     '''
     b1_voters = round(n_voters * ratio)
     b2_voters = n_voters - b1_voters
-    block1 = generate_block_scores(b1_voters, num_parties, dominant, favor_minor=True)
-    block2 = generate_block_scores(b2_voters, num_parties, dominant, favor_minor=False)
+    # block1 = generate_block_scores(b1_voters, num_parties, dominant, favor_minor=True)
+    # block2 = generate_block_scores(b2_voters, num_parties, dominant, favor_minor=False)
+    block1 = generate_threads(b1_voters, num_parties, dominant, favor_minor=True)
+    block2 = generate_threads(b2_voters, num_parties, dominant, favor_minor=False)
     return np.vstack((block1, block2))
 
 
