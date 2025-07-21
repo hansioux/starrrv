@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Voting System Simulation: STAR + RRV with Tactical Voting and 1% Threshold
+# # Voting System Simulation: STAR + RRV with Tactical Voting and 2% Threshold
 #
 # - STAR (district) + RRV (national)
 # - Tactical alignments:
-#   - Party A voters help Party B
-#   - Party C & E voters help Party D
-# - National 1% threshold for party eligibility
+#   - Party A is index 0.  Parties with even indexes align with Party A
+#   - Party B is index 1.  Parties with odd indexes align with Part B
+# - National 2% threshold for party eligibility
 # - Comparison with FPTP and MMP
 
 import os
