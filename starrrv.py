@@ -80,6 +80,7 @@ def threshold_filter(df, threshold=0.02):
     share = totals / totals.sum()
     return df[share[share >= threshold].index]
 
+
 # Generate split block scores
 def generate_block_scores(v, pt, rng, dominant, favor_minor):
     '''
@@ -124,41 +125,6 @@ def generate_block_scores(v, pt, rng, dominant, favor_minor):
     return scores
 
 
-# def generate_block_scores(v, pt, rng, dominant, favor_minor):
-#     '''
-#     Allocates scores to each of the parties for v voters, based on party and coalition preference.
-#     '''
-#     scores = np.zeros((v, pt), dtype=int)
-#     for i in range(v):
-#         # Determine coalition preference for this voter
-#         coalition_A_pref = rng.choice([0, 1])
-#         coalition_B_pref = 1 - coalition_A_pref
-#
-#         if favor_minor:
-#             # Voters score minor parties ahead of major parties in their coalition
-#             scores[i, dominant[0]] = coalition_A_pref
-#             scores[i, dominant[1]] = coalition_B_pref
-#             for j in range(2, pt):
-#                 if j % 2 == 0 and coalition_A_pref == 1: # Coalition A minor party
-#                     scores[i, j] = rng.choice([2, 3, 4, 5])
-#                 elif j % 2 != 0 and coalition_B_pref == 1: # Coalition B minor party
-#                     scores[i, j] = rng.choice([2, 3, 4, 5])
-#                 else:
-#                     scores[i, j] = rng.choice([0, 1])
-#         else:
-#             # Voters score major parties ahead of minor parties
-#             scores[i, dominant[0]] = 5 if coalition_A_pref == 1 else 0
-#             scores[i, dominant[1]] = 5 if coalition_B_pref == 1 else 0
-#             for j in range(2, pt):
-#                 if j % 2 == 0 and scores[i, dominant[0]] == 5: # Coalition A minor party
-#                     scores[i, j] = rng.choice([3, 4])
-#                 elif j % 2 != 0 and scores[i, dominant[1]] == 5: # Coalition B minor party
-#                     scores[i, j] = rng.choice([3, 4])
-#                 else:
-#                     scores[i, j] = rng.choice([0, 1])
-#     return scores
-
-
 def generate_split_voter_blocks(n_voters, dominant, rng, ratio, num_parties):
     '''
     Split voter block based on the ratio of voters that would score minor parties
@@ -171,7 +137,6 @@ def generate_split_voter_blocks(n_voters, dominant, rng, ratio, num_parties):
     return np.vstack((block1, block2))
 
 
-# --- NEW AND CORRECTED FUNCTION ---
 def generate_scores(n, p, dominant, rng, total_domin_pref):
     """
     Generates scores for an FPTP simulation with a clear 40/40/20 split.
@@ -181,7 +146,7 @@ def generate_scores(n, p, dominant, rng, total_domin_pref):
     voters_A = round(n * (total_domin_pref / 2))
     voters_B = round(n * (total_domin_pref / 2))
     voters_other = n - voters_A - voters_B
-    
+
     # 2. Generate base scores (e.g., random low scores for all)
     scores = rng.integers(0, 3, size=(n, p))
 
