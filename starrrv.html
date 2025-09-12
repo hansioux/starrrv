@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voting System Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .slider-label { min-width: 210px; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Voting System Simulator</h1>
+            <p class="text-lg text-gray-600 mt-2">Compare STAR+RRV, FPTP+List, and MMP electoral systems.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Parameters Panel -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-bold mb-6 border-b pb-3">Parameters</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label for="voters" class="block font-medium text-gray-700">Voters per District</label>
+                        <input type="number" id="voters" value="1000" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="parties" class="block font-medium text-gray-700">Number of Parties</label>
+                        <input type="number" id="parties" value="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="districts" class="block font-medium text-gray-700">District Seats</label>
+                        <input type="number" id="districts" value="79" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                     <div>
+                        <label for="national" class="block font-medium text-gray-700">National Seats (if blank, uses half of districts)</label>
+                        <input type="number" id="national" placeholder="e.g., 40" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    
+                    <div class="pt-4 border-t">
+                        <label for="major" class="block font-medium text-gray-700">Support for Major Parties</label>
+                        <div class="flex items-center space-x-4 mt-1">
+                           <input type="range" id="major" min="0" max="1" step="0.01" value="0.8" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                           <span id="major-value" class="font-semibold text-indigo-600 w-12 text-right">80%</span>
+                        </div>
+                    </div>
+
+                    <div>
+                         <label for="star" class="block font-medium text-gray-700">Major Voters Scoring Minor Higher (STAR)</label>
+                         <div class="flex items-center space-x-4 mt-1">
+                           <input type="range" id="star" min="0" max="1" step="0.01" value="0.15" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                           <span id="star-value" class="font-semibold text-indigo-600 w-12 text-right">15%</span>
+                        </div>
+                    </div>
+                    
+                     <div>
+                         <label for="threshold" class="block font-medium text-gray-700">National Seat Threshold</label>
+                         <div class="flex items-center space-x-4 mt-1">
+                           <input type="range" id="threshold" min="0" max="0.1" step="0.005" value="0.02" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                           <span id="threshold-value" class="font-semibold text-indigo-600 w-12 text-right">2.0%</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="mt-8">
+                    <button id="run-simulation" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-300 shadow-md">
+                        Run Simulation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-3">Results</h2>
+                 <div id="loading" class="hidden text-center py-16">
+                    <svg class="animate-spin h-10 w-10 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-4 text-gray-600 font-medium">Running simulation...</p>
+                </div>
+                <div id="results-container" class="space-y-8">
+                    <!-- Charts will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- UI BINDINGS ---
+        const sliders = [
+            { id: 'major', valueId: 'major-value', format: v => `${(v * 100).toFixed(0)}%` },
+            { id: 'star', valueId: 'star-value', format: v => `${(v * 100).toFixed(0)}%` },
+            { id: 'threshold', valueId: 'threshold-value', format: v => `${(v * 100).toFixed(1)}%` }
+        ];
+
+        sliders.forEach(s => {
+            const slider = document.getElementById(s.id);
+            const valueSpan = document.getElementById(s.valueId);
+            slider.addEventListener('input', () => {
+                valueSpan.textContent = s.format(slider.value);
+            });
+        });
+        
+        document.getElementById('run-simulation').addEventListener('click', runSimulation);
+        
+        // --- SIMULATION LOGIC (PYTHON PORT) ---
+
+        // Helper for seeded random numbers for reproducibility
+        class SeededRandom {
+            constructor(seed) {
+                this.seed = seed;
+            }
+            random() {
+                const x = Math.sin(this.seed++) * 10000;
+                return x - Math.floor(x);
+            }
+            choice(arr, p = null) {
+                if (p) {
+                    const r = this.random();
+                    let cumulativeP = 0;
+                    for (let i = 0; i < p.length; i++) {
+                        cumulativeP += p[i];
+                        if (r < cumulativeP) {
+                            return arr[i];
+                        }
+                    }
+                    return arr[arr.length - 1]; // Fallback
+                }
+                return arr[Math.floor(this.random() * arr.length)];
+            }
+            shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(this.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+        }
+
+        const score_scale = 6;
+        let charts = [];
+
+        // --- Core Voting Algorithms ---
+        function star_voting_winner(scores, candidates) {
+            const totals = candidates.map((c, i) => scores.reduce((sum, row) => sum + row[i], 0));
+            
+            if (candidates.length < 2) return candidates[0];
+
+            const sortedByScore = candidates.map((c, i) => ({ name: c, score: totals[i] }))
+                .sort((a, b) => b.score - a.score);
+            
+            const top_two_names = [sortedByScore[0].name, sortedByScore[1].name];
+            const top_two_indices = [candidates.indexOf(top_two_names[0]), candidates.indexOf(top_two_names[1])];
+
+            let preference_count = 0;
+            for(const row of scores) {
+                if (row[top_two_indices[0]] > row[top_two_indices[1]]) {
+                    preference_count++;
+                }
+            }
+
+            return (preference_count > scores.length / 2) ? top_two_names[0] : top_two_names[1];
+        }
+
+        function reweighted_range_voting(scores, parties, seats) {
+            let weights = new Array(scores.length).fill(1);
+            let seats_won = Object.fromEntries(parties.map(p => [p, 0]));
+            const max_score = score_scale - 1;
+
+            for (let i = 0; i < seats; i++) {
+                const weighted_totals = parties.map((p, party_idx) => {
+                    return scores.reduce((sum, row, voter_idx) => sum + row[party_idx] * weights[voter_idx], 0);
+                });
+
+                const winner_idx = weighted_totals.indexOf(Math.max(...weighted_totals));
+                const winner = parties[winner_idx];
+                seats_won[winner]++;
+
+                for (let j = 0; j < scores.length; j++) {
+                    const support = scores[j][winner_idx] / max_score;
+                    weights[j] /= (1 + support);
+                }
+            }
+            return seats_won;
+        }
+
+        function fptp_winner(scores, candidates) {
+            const votes = {};
+            candidates.forEach(c => votes[c] = 0);
+            
+            for (const row of scores) {
+                const max_score = Math.max(...row);
+                const winner_idx = row.indexOf(max_score);
+                votes[candidates[winner_idx]]++;
+            }
+            
+            return Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b);
+        }
+
+        // --- Ballot Generation ---
+        function generate_block_scores(v, pt, rng, dominant, favor_minor) {
+            let scores = Array.from({ length: v }, () => new Array(pt).fill(0));
+            for (let i = 0; i < v; i++) {
+                if (favor_minor) {
+                    const coalition_A_pref = rng.choice([0, 1]);
+                    if (coalition_A_pref === 1) { // Prefers Coalition A
+                        scores[i][dominant[0]] = 1;
+                        for (let j = 2; j < pt; j += 2) scores[i][j] = rng.choice([2, 3, 4, 5]);
+                    } else { // Prefers Coalition B
+                        scores[i][dominant[1]] = 1;
+                        for (let j = 3; j < pt; j += 2) scores[i][j] = rng.choice([2, 3, 4, 5]);
+                    }
+                } else {
+                    const voter_choice = rng.choice(dominant);
+                    if (voter_choice === dominant[0]) { // Voter chooses Party A
+                        scores[i][dominant[0]] = 5;
+                        for (let j = 2; j < pt; j += 2) scores[i][j] = rng.choice([3, 4]);
+                    } else { // Voter chooses Party B
+                        scores[i][dominant[1]] = 5;
+                        for (let j = 3; j < pt; j += 2) scores[i][j] = rng.choice([3, 4]);
+                    }
+                }
+            }
+            // Fill remaining zeros with low scores
+             for(let i=0; i<v; i++) {
+                for(let j=0; j<pt; j++) {
+                    if (scores[i][j] === 0) {
+                        scores[i][j] = rng.choice([0,1]);
+                    }
+                }
+            }
+            return scores;
+        }
+
+        function generate_split_voter_blocks(n_voters, dominant, rng, ratio, num_parties) {
+            const b1_voters = Math.round(n_voters * ratio);
+            const b2_voters = n_voters - b1_voters;
+            const block1 = generate_block_scores(b1_voters, num_parties, rng, dominant, true);
+            const block2 = generate_block_scores(b2_voters, num_parties, rng, dominant, false);
+            return block1.concat(block2);
+        }
+
+        function generate_scores_fptp(n, p, dominant, rng, total_domin_pref) {
+            const voters_A = Math.round(n * (total_domin_pref / 2));
+            const voters_B = Math.round(n * (total_domin_pref / 2));
+            const voters_other = n - voters_A - voters_B;
+
+            let scores = Array.from({ length: n }, () => Array.from({length: p}, () => rng.choice([0,1,2])));
+            
+            for(let i=0; i<voters_A; i++) scores[i][dominant[0]] = 5;
+            for(let i=voters_A; i<voters_A+voters_B; i++) scores[i][dominant[1]] = 5;
+
+            if (voters_other > 0 && p > 2) {
+                const minor_parties = Array.from({length: p}, (_, i) => i).filter(i => !dominant.includes(i));
+                if (minor_parties.length > 0) {
+                     for(let i=voters_A+voters_B; i<n; i++) {
+                         scores[i][rng.choice(minor_parties)] = 4;
+                     }
+                }
+            }
+            rng.shuffle(scores);
+            return scores;
+        }
+
+        // --- Main Simulation Orchestration ---
+        function generate_per_district_data(params) {
+            const { district_candidates, num_voters, dominant, star_pref, party_names, num_parties, num_districts, total_domin_pref, rng } = params;
+
+            let district_scores_star = {};
+            let national_scores_list = [];
+            let district_scores_fptp = {};
+
+            Object.keys(district_candidates).forEach(d => {
+                const candidates = district_candidates[d];
+                district_scores_star[d] = generate_split_voter_blocks(num_voters, dominant, rng, star_pref, num_parties);
+                national_scores_list.push(...generate_split_voter_blocks(num_voters, dominant, rng, star_pref, num_parties));
+                district_scores_fptp[d] = generate_scores_fptp(num_voters, num_parties, dominant, rng, total_domin_pref);
+            });
+            
+            const total_fptp_voters = num_voters * num_districts;
+            const voters_for_coalition_A = Math.round(total_fptp_voters * 0.5);
+            const voters_for_coalition_B = total_fptp_voters - voters_for_coalition_A;
+
+            const prob_A_major = total_domin_pref / 2;
+            const prob_minor = (num_parties > 2) ? (1 - total_domin_pref) / (num_parties - 2) : 0;
+            
+            let probs_A = new Array(num_parties).fill(0);
+            party_names.forEach((p, i) => {
+                if (i === dominant[0]) probs_A[i] = prob_A_major;
+                else if (!dominant.includes(i) && i % 2 === 0) probs_A[i] = prob_minor;
+            });
+            let sum_A = probs_A.reduce((a, b) => a + b, 0);
+            if (sum_A > 0) probs_A = probs_A.map(p => p / sum_A);
+            
+            let probs_B = new Array(num_parties).fill(0);
+            party_names.forEach((p, i) => {
+                if (i === dominant[1]) probs_B[i] = prob_A_major;
+                else if (!dominant.includes(i) && i % 2 !== 0) probs_B[i] = prob_minor;
+            });
+            let sum_B = probs_B.reduce((a, b) => a + b, 0);
+            if (sum_B > 0) probs_B = probs_B.map(p => p / sum_B);
+            
+            let single_choice_votes = [];
+            for(let i=0; i<voters_for_coalition_A; i++) single_choice_votes.push(rng.choice(party_names, probs_A));
+            for(let i=0; i<voters_for_coalition_B; i++) single_choice_votes.push(rng.choice(party_names, probs_B));
+
+            return { district_scores_star, district_scores_fptp, national_scores_list, single_choice_votes };
+        }
+
+        function tally_votes(params) {
+            const { district_scores_star, national_scores_list, national_seats, district_scores_fptp, num_districts, single_choice_votes, thresh, party_names, district_candidates } = params;
+
+            // --- STAR + RRV ---
+            let district_star_wins = Object.fromEntries(party_names.map(p => [p, 0]));
+            Object.keys(district_scores_star).forEach(d => {
+                const winner = star_voting_winner(district_scores_star[d], district_candidates[d]);
+                const winner_party = winner.split('_')[0];
+                district_star_wins[winner_party]++;
+            });
+            const rrv_seats = reweighted_range_voting(national_scores_list, party_names, national_seats);
+
+            // --- FPTP + List PR ---
+            let district_fptp_wins = Object.fromEntries(party_names.map(p => [p, 0]));
+            Object.keys(district_scores_fptp).forEach(d => {
+                const winner = fptp_winner(district_scores_fptp[d], district_candidates[d]);
+                const winner_party = winner.split('_')[0];
+                district_fptp_wins[winner_party]++;
+            });
+            
+            let vote_counts = Object.fromEntries(party_names.map(p => [p, 0]));
+            single_choice_votes.forEach(vote => vote_counts[vote]++);
+            
+            const total_valid_votes = single_choice_votes.length;
+            const eligible_parties = party_names.filter(p => (vote_counts[p] / total_valid_votes) >= thresh);
+            const eligible_votes_total = eligible_parties.reduce((sum, p) => sum + vote_counts[p], 0);
+
+            let hare_quota_seats = Object.fromEntries(party_names.map(p => [p, 0]));
+            if (eligible_parties.length > 0 && national_seats > 0) {
+                const quota = eligible_votes_total / national_seats;
+                let remainders = [];
+                let initial_seats_total = 0;
+                eligible_parties.forEach(p => {
+                    const seats = Math.floor(vote_counts[p] / quota);
+                    hare_quota_seats[p] = seats;
+                    initial_seats_total += seats;
+                    remainders.push({ party: p, rem: vote_counts[p] % quota });
+                });
+                remainders.sort((a,b) => b.rem - a.rem);
+                let seats_to_allocate = national_seats - initial_seats_total;
+                for(let i=0; i<seats_to_allocate; i++) {
+                    if (remainders[i]) hare_quota_seats[remainders[i].party]++;
+                }
+            }
+
+            // --- MMP ---
+            const total_seats = num_districts + national_seats;
+            const national_totals = party_names.map((p, i) => national_scores_list.reduce((sum, row) => sum + row[i], 0));
+            const national_sum = national_totals.reduce((a,b) => a+b, 0);
+
+            let ideal_seats = Object.fromEntries(party_names.map(p => [p, 0]));
+            if (national_sum > 0) {
+                party_names.forEach((p, i) => {
+                    const proportion = national_totals[i] / national_sum;
+                    ideal_seats[p] = Math.round(proportion * total_seats);
+                });
+                 // Adjust for rounding errors
+                let current_total = Object.values(ideal_seats).reduce((a,b)=>a+b, 0);
+                if (current_total !== total_seats) {
+                    const diff = total_seats - current_total;
+                    const proportions = party_names.map((p,i) => national_totals[i] / national_sum);
+                    const remainders = party_names.map((p,i) => proportions[i] * total_seats - ideal_seats[p]);
+                    let sorted_rem = remainders.map((r,i) => ({party: party_names[i], rem: r})).sort((a,b) => b.rem - a.rem);
+
+                    if (diff > 0) { // Need to add seats
+                        for(let i=0; i<diff; i++) ideal_seats[sorted_rem[i].party]++;
+                    } else { // Need to remove seats
+                         sorted_rem.sort((a,b) => a.rem - b.rem);
+                         for(let i=0; i<Math.abs(diff); i++) ideal_seats[sorted_rem[i].party]--;
+                    }
+                }
+            }
+
+            let mmp_topup = { ...ideal_seats };
+            party_names.forEach(p => {
+                mmp_topup[p] = Math.max(0, ideal_seats[p] - district_fptp_wins[p]);
+            });
+            let total_mmp = { ...district_fptp_wins };
+            party_names.forEach(p => total_mmp[p] += mmp_topup[p]);
+
+            return { district_star_wins, rrv_seats, district_fptp_wins, hare_quota_seats, total_mmp };
+        }
+        
+        // --- Charting ---
+        function createChart(canvasId, title, labels, data1, data2, label1, label2, colors) {
+            const container = document.getElementById('results-container');
+            const canvas = document.createElement('canvas');
+            canvas.id = canvasId;
+            container.appendChild(canvas);
+            
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: label1, data: data1, backgroundColor: colors[0], },
+                        { label: label2, data: data2, backgroundColor: colors[1], }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, beginAtZero: true, title: { display: true, text: 'Seats' } },
+                        y: { stacked: true }
+                    },
+                    plugins: {
+                        title: { display: true, text: title, font: { size: 16 } },
+                        tooltip: { mode: 'index' }
+                    }
+                }
+            });
+        }
+        
+        // --- Main Execution ---
+        function runSimulation() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results-container').classList.add('hidden');
+            
+            // Clear previous results
+            document.getElementById('results-container').innerHTML = '';
+            charts.forEach(chart => chart.destroy());
+            charts = [];
+
+            setTimeout(() => {
+                // Get parameters from UI
+                const params = {
+                    num_voters: parseInt(document.getElementById('voters').value),
+                    num_parties: parseInt(document.getElementById('parties').value),
+                    num_districts: parseInt(document.getElementById('districts').value),
+                    national_seats: document.getElementById('national').value ? parseInt(document.getElementById('national').value) : Math.floor(parseInt(document.getElementById('districts').value) / 2),
+                    total_domin_pref: parseFloat(document.getElementById('major').value),
+                    domin_star_voter_ratio: parseFloat(document.getElementById('star').value),
+                    thresh: parseFloat(document.getElementById('threshold').value)
+                };
+                
+                // Setup
+                const rng = new SeededRandom(42);
+                const party_names = Array.from({ length: params.num_parties }, (_, i) => `Party ${String.fromCharCode(65 + i)}`);
+                const dominant = [0, 1];
+                const minor = Array.from({ length: params.num_parties }, (_, i) => i).filter(i => !dominant.includes(i));
+                const district_candidates = Object.fromEntries(
+                    Array.from({length: params.num_districts}, (_,i) => [`District_${i+1}`, party_names.map(p => `${p}_Cand_${i+1}`)])
+                );
+
+                const domin_pref = params.total_domin_pref / dominant.length;
+                const minor_pref = minor.length > 0 ? (1 - params.total_domin_pref) / minor.length : 0;
+                const star_pref = (params.total_domin_pref * params.domin_star_voter_ratio) + (1 - params.total_domin_pref);
+
+                // Generate Data
+                const ballotData = generate_per_district_data({
+                    ...params, rng, party_names, dominant, district_candidates, star_pref
+                });
+                
+                // Tally Results
+                const results = tally_votes({
+                    ...params, ...ballotData, party_names, district_candidates
+                });
+                
+                // Display Results
+                const sortedParties = [...party_names].sort((a,b) => {
+                    const totalA = results.district_star_wins[a] + results.rrv_seats[a];
+                    const totalB = results.district_star_wins[b] + results.rrv_seats[b];
+                    return totalA - totalB;
+                });
+                
+                charts.push(createChart(
+                    'chart1',
+                    `STAR + RRV (${(params.thresh * 100).toFixed(1)}% Threshold)`,
+                    sortedParties,
+                    sortedParties.map(p => results.district_star_wins[p]),
+                    sortedParties.map(p => results.rrv_seats[p]),
+                    'District (STAR)',
+                    'National (RRV)',
+                    ['#fde047', '#7dd3fc'] // yellow, blue
+                ));
+
+                charts.push(createChart(
+                    'chart2',
+                    `FPTP + Party List (${(params.thresh * 100).toFixed(1)}% Threshold)`,
+                    sortedParties,
+                    sortedParties.map(p => results.district_fptp_wins[p]),
+                    sortedParties.map(p => results.hare_quota_seats[p]),
+                    'District (FPTP)',
+                    'National (Hare Quota)',
+                    ['#fca5a5', '#fdba74'] // red, orange
+                ));
+
+                charts.push(createChart(
+                    'chart3',
+                    `MMP (${(params.thresh * 100).toFixed(1)}% Threshold)`,
+                    sortedParties,
+                    sortedParties.map(p => results.district_fptp_wins[p]),
+                    sortedParties.map(p => results.total_mmp[p] - results.district_fptp_wins[p]),
+                    'District (FPTP)',
+                    'Top-up',
+                    ['#bbf7d0', '#86efac'] // light green, green
+                ));
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('results-container').classList.remove('hidden');
+
+            }, 50); // Small timeout to allow UI to update
+        }
+    </script>
+</body>
+</html>
