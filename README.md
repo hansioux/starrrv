@@ -1,5 +1,10 @@
 # STAR RRV Hybrid Parliamentary Voting Simulator
 
+Run web-based simulation:
+[https://hansioux.github.io/starrrv/starrrv.html](https://hansioux.github.io/starrrv/starrrv.html)
+
+![Simulated STAR + RRV election result](/assets/images/result.png "Simulated STAR + RRV  election result")
+
 ## Purpose
 Simulate outcomes of STAR voting and Reweighted Range Voting hybrid district plus national party lists voting system and compare that with First Past the Post and MMP.
 
